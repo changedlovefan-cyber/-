@@ -1,0 +1,25 @@
+{
+  "name": "error-log-stream",
+  "version": "1.0.0",
+  "description": "エラーログが大量に出てくるだけの暇つぶしのやつです。",
+  "main": "server.js",
+  "bin": {
+    "error-stream": "./cli.js"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "cli": "node cli.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "error",
+    "log",
+    "stream",
+    "panic",
+    "simulator",
+    "terminal",
+    "cyberpunk"
+  ],
+  "author": "changedlovefan-cyber",
+  "license": "MIT"
+}

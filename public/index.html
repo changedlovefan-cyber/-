@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>エラーログが大量に出てくるだけの暇つぶしのやつ</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body class="crt-enabled">
+  <!-- CRT走査線オーバーレイ -->
+  <div class="crt-lines" id="crtLines"></div>
+
+  <!-- メインコンテナ -->
+  <div class="app-container">
+    <!-- 最上部ステータスバー -->
+    <header class="top-bar">
+      <div class="brand">
+        <span class="blinking-dot"></span>
+        <h1 class="app-title">ERROR_LOG_STREAM // 暇つぶしシステム</h1>
+        <span class="badge badge-sev1" id="sevBadge">DEFCON 1 : TOTAL FAILURE</span>
+      </div>
+      
+      <!-- リアルタイム計測カウンター -->
+      <div class="live-metrics">
+        <div class="metric-card">
+          <span class="metric-label">TOTAL ERRORS</span>
+          <span class="metric-val text-red" id="counterTotal">0</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">ERR RATE</span>
+          <span class="metric-val text-yellow" id="counterRate">0 /s</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">HEAP LEAK</span>
+          <span class="metric-val text-cyan" id="counterMem">99.9%</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">UPTIME</span>
+          <span class="metric-val text-green" id="counterUptime">00:00:00</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- コントロールパネル -->
+    <section class="control-panel">
+      <div class="control-group">
+        <label for="scenarioSelect">💥 シナリオ選択:</label>
+        <select id="scenarioSelect">
+          <option value="all">🎲 オールスター・カオス（全部盛り）</option>
+          <option value="cloud">🌐 Web/クラウドインフラ大崩壊</option>
+          <option value="kernel">💻 Linuxカーネルパニック & C/C++</option>
+          <option value="scifi">🚀 SF宇宙船AI暴走 & 臨界事故</option>
+          <option value="gamedev">👾 ゲーム開発・物理演算の怪奇現象</option>
+          <option value="developer">☕ プログラマー日常の絶望 & シュール</option>
+        </select>
+      </div>
+
+      <div class="control-group speed-group">
+        <label for="speedSlider">⚡ 噴出スピード: <span id="speedDisplay">20 行/秒</span></label>
+        <input type="range" id="speedSlider" min="1" max="100" value="20">
+      </div>
+
+      <div class="button-group">
+        <button id="btnPause" class="btn btn-primary" title="一時停止/再開">⏸️ 一時停止</button>
+        <button id="btnStep" class="btn btn-secondary" title="1行だけ追加">⚡ +1行</button>
+        <button id="btnEmergencyFix" class="btn btn-danger" title="絶対に押すな">🚨 緊急復旧試行</button>
+        <button id="btnHackerMode" class="btn btn-accent" title="キーボードをカタカタ叩いてエラーを噴出">⌨️ ハッカー連打モード</button>
+        <button id="btnSelfDestruct" class="btn btn-destruct" title="自爆">💥 自爆</button>
+      </div>
+
+      <div class="button-group utility-group">
+        <button id="btnSound" class="btn btn-icon" title="警告ビープ音 ON/OFF">🔇 サウンド: OFF</button>
+        <button id="btnCrt" class="btn btn-icon" title="ブラウン管走査線エフェクト">📺 CRT: ON</button>
+        <button id="btnClear" class="btn btn-icon" title="画面クリア">🧹 クリア</button>
+        <button id="btnCopy" class="btn btn-icon" title="ログをコピー">📋 コピー</button>
+        <button id="btnDownload" class="btn btn-icon" title="TXT保存">💾 保存</button>
+        <button id="btnFullscreen" class="btn btn-icon" title="全画面表示">🖥️ 全画面</button>
+      </div>
+    </section>
+
+    <!-- ハッカーモード用プロンプトバー（キーボード連打モード時に表示） -->
+    <div class="hacker-bar" id="hackerBar" style="display: none;">
+      <span class="hacker-label">⌨️ 【ハッカー連打モード発動中】 キーボードを好きなだけ叩いてください！キーを押すたびに障害が発生します。 (Escで終了)</span>
+    </div>
+
+    <!-- ターミナルログコンテナ -->
+    <main class="terminal-container" id="terminalContainer">
+      <div class="terminal-body" id="logOutput">
+        <!-- ログ行がここに動的に追加されます -->
+      </div>
+      
+      <!-- 最下部スクロール復帰ボタン -->
+      <button class="scroll-bottom-btn" id="scrollBottomBtn" style="display: none;">
+        ↓ 最新のエラーに追従する
+      </button>
+    </main>
+
+    <!-- フッター -->
+    <footer class="bottom-bar">
+      <div class="footer-left">
+        <span>STATUS: <span class="text-red animate-blink">RUNNING_INTO_OBLIVION</span></span>
+        <span class="sep">|</span>
+        <span>TIP: 会議中に全画面にして深刻な顔をすると「大トラブル対応中」を演出できます</span>
+      </div>
+      <div class="footer-right">
+        <span>CHANGEDLOVEFAN-CYBER // ERROR LOG STREAM</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- エラー詳細モーダル（行クリック時） -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modalTitle">⚠️ 障害インシデント詳細</h3>
+        <button class="modal-close" id="modalClose">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-log-text" id="modalLogContent"></p>
+        <div class="excuse-box">
+          <div class="excuse-title">🤖 開発者の言い訳ジェネレーター:</div>
+          <p class="excuse-text" id="modalExcuseText">分析中...</p>
+          <button class="btn btn-secondary btn-sm" id="btnRerollExcuse">🔄 別の言い訳を生成</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="modalConfirmBtn">閉じて放置する</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="error-generators.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
