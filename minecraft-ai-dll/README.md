@@ -114,6 +114,23 @@ cmake --build build --config Release
 
 出力: `build\Release\MinecraftAI.dll` (+ `config.json`)
 
+### 3-B2. CI（GitHub Actions）からビルド済み DLL を取る
+
+`.github/workflows/build-minecraft-ai-dll.yml` が push / PR のたびに
+MinGW-w64 でビルドし、**Checks** から成果物をダウンロードできるようにしています。
+
+1. GitHub の **Actions** タブ → `Build DLL (MinGW-w64)` の最新実行を開く
+2. 下部の **Artifacts** から `MinecraftAI-mingw-x64` をダウンロード
+3. PR の場合は **Checks** タブ → 該当ジョブ → Artifacts からも取得可能
+
+zip の中身: `MinecraftAI.dll` / `config.json` / `EXPORTS.txt` / `BUILD_INFO.txt`
+（どの commit からビルドしたかが `BUILD_INFO.txt` に残ります）
+
+CI では次の検証も自動で行われます。
+
+- x64 の PE DLL であること（machine = `0x8664`、`IMAGE_FILE_DLL`）
+- `MinecraftAIStart` がエクスポートされていること
+
 ### 3-C. ビルド結果の確認（任意）
 
 DLL は x64 の PE DLL で、`MinecraftAIStart` / `MinecraftAIStop` をエクスポートします。
