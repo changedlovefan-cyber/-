@@ -1,0 +1,137 @@
+name: Build DLL (MinGW-w64)
+
+# push / PR のたびに x64 DLL をビルドし、Checks から成果物をダウンロードできるようにする。
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "minecraft-ai-dll/**"
+      - ".github/workflows/build-minecraft-ai-dll.yml"
+  pull_request:
+    paths:
+      - "minecraft-ai-dll/**"
+      - ".github/workflows/build-minecraft-ai-dll.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: minecraft-ai-dll
+
+jobs:
+  build:
+    name: Build MinecraftAI.dll (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install MinGW-w64
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends g++-mingw-w64-x86-64
+
+      - name: Show toolchain
+        run: x86_64-w64-mingw32-g++ --version | head -1
+
+      - name: Build
+        env:
+          CXX: x86_64-w64-mingw32-g++
+        run: |
+          chmod +x build_mingw.sh
+          ./build_mingw.sh
+
+      - name: Verify PE (x64 DLL)
+        run: |
+          python3 - <<'PY'
+          import struct, sys
+          path = "dist/MinecraftAI.dll"
+          d = open(path, "rb").read()
+          assert d[:2] == b"MZ", "PE シグネチャがありません"
+          pe = struct.unpack_from("<I", d, 0x3C)[0]
+          assert d[pe:pe + 4] == b"PE\0\0", "PE ヘッダが不正"
+          machine = struct.unpack_from("<H", d, pe + 4)[0]
+          chars = struct.unpack_from("<H", d, pe + 22)[0]
+          assert machine == 0x8664, f"x64 ではありません (machine=0x{machine:04x})"
+          assert chars & 0x2000, "DLL フラグが立っていません"
+          print(f"OK: x64 PE DLL, {len(d)} bytes")
+          PY
+
+      - name: List exports
+        run: |
+          python3 - <<'PY'
+          import struct
+          d = open("dist/MinecraftAI.dll", "rb").read()
+          pe = struct.unpack_from("<I", d, 0x3C)[0]
+          nsec = struct.unpack_from("<H", d, pe + 6)[0]
+          optsz = struct.unpack_from("<H", d, pe + 20)[0]
+          opt = pe + 24
+          magic = struct.unpack_from("<H", d, opt)[0]
+          nrva = opt + (112 if magic == 0x20B else 96)
+          exp_rva = struct.unpack_from("<I", d, nrva)[0]
+          secs = []
+          so = opt + optsz
+          for _ in range(nsec):
+              vs, va, rs, ra = struct.unpack_from("<IIII", d, so + 8)
+              secs.append((va, vs, ra, rs))
+              so += 40
+
+          def r2o(r):
+              for va, vs, ra, rs in secs:
+                  if va <= r < va + max(vs, rs):
+                      return ra + (r - va)
+              return None
+
+          eo = r2o(exp_rva)
+          names = []
+          if eo:
+              nnam = struct.unpack_from("<I", d, eo + 24)[0]
+              no = r2o(struct.unpack_from("<I", d, eo + 32)[0])
+              for i in range(nnam):
+                  p = r2o(struct.unpack_from("<I", d, no + 4 * i)[0])
+                  names.append(d[p:d.index(b"\0", p)].decode())
+          print("exports:", ", ".join(names) or "(none)")
+          assert "MinecraftAIStart" in names, "MinecraftAIStart がエクスポートされていません"
+          with open("dist/EXPORTS.txt", "w") as f:
+              f.write("\n".join(names) + "\n")
+          PY
+
+      - name: Package
+        run: |
+          cd dist
+          rm -f *.pdb *.lib *.exp
+          cat > BUILD_INFO.txt <<EOF
+          MinecraftAI.dll
+          --------------
+          build : GitHub Actions #${{ github.run_number }}
+          commit: ${{ github.sha }}
+          ref   : ${{ github.ref_name }}
+          compiler: $(x86_64-w64-mingw32-g++ --version | head -1)
+          EOF
+          cd ..
+          (cd dist && zip -9 -r ../MinecraftAI-mingw-x64.zip .)
+          ls -la MinecraftAI-mingw-x64.zip
+
+      - name: Upload DLL (Checks からダウンロード可能)
+        uses: actions/upload-artifact@v4
+        with:
+          name: MinecraftAI-mingw-x64
+          path: minecraft-ai-dll/MinecraftAI-mingw-x64.zip
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Job summary
+        run: |
+          {
+            echo "## MinecraftAI.dll (x64 / MinGW-w64)"
+            echo
+            echo "ビルド成功。右側の **Artifacts** から \`MinecraftAI-mingw-x64\` をダウンロードできます。"
+            echo
+            echo '```'
+            ls -la MinecraftAI-mingw-x64.zip
+            echo '```'
+            echo
+            echo "### エクスポート"
+            echo '```'
+            cat dist/EXPORTS.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

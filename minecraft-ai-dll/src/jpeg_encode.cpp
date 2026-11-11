@@ -126,6 +126,21 @@ bool SelfTestJpegRoundTrip(std::string& message) {
 #include <wincodec.h>
 #include <objbase.h>
 
+// ---- WIC の GUID を自前定義 ----
+// wincodec.h の GUID_* は外部シンボル (uuid ライブラリ or DEFINE_GUID の実体) を
+// 参照するため、MSVC では「未解決の外部シンボル」になりやすい。
+// 値は WIC のピクセルフォーマット仕様（共通プレフィックス 6fddc324-...-c9 + 連番）。
+static const CLSID kCLSID_WICImagingFactory = {
+    0xCACAF262, 0x9370, 0x4615, {0xA1, 0x3B, 0x9F, 0x55, 0x39, 0xDA, 0x4C, 0x0A}};
+static const IID kIID_IWICImagingFactory = {
+    0xEC5EC8A9, 0xC395, 0x4314, {0x9C, 0x77, 0x54, 0xD7, 0xA9, 0x35, 0xFF, 0x70}};
+static const GUID kWICPixelFormat32bppBGRA = {
+    0x6FDDC324, 0x4E03, 0x4BFE, {0xB1, 0x85, 0x3D, 0x77, 0x76, 0x8D, 0xC9, 0x0F}};
+static const GUID kWICPixelFormat24bppBGR = {
+    0x6FDDC324, 0x4E03, 0x4BFE, {0xB1, 0x85, 0x3D, 0x77, 0x76, 0x8D, 0xC9, 0x0C}};
+static const GUID kWICContainerFormatJpeg = {
+    0x19E4A5AA, 0x5662, 0x4FC5, {0xA0, 0xC0, 0x17, 0x58, 0x02, 0x8E, 0x10, 0x57}};
+
 // windowscodecs.dll を直接ロードする（-lwindowscodecs 不要）。
 static HMODULE LoadWic() {
     HMODULE h = LoadLibraryW(L"windowscodecs.dll");
@@ -183,13 +198,8 @@ std::string EncodePixelsToBase64Jpeg(const unsigned char* pixels, int width, int
         (PFN_WICCreateFactory)GetProcAddress(hMod, "WICCreateImagingFactory_Proxy");
     if (!pWicFactory) { FreeLibrary(hMod); return ""; }
 
-    static const CLSID CLSID_WICImagingFactory_L = {
-        0xCACAF262, 0x9370, 0x4615, {0xA1, 0x3B, 0x9F, 0x55, 0x39, 0xDA, 0x4C, 0x0A}};
-    static const IID IID_IWICImagingFactory_L = {
-        0xEC5EC8A9, 0xC395, 0x4314, {0x9C, 0x77, 0x54, 0xD7, 0xA9, 0x35, 0xFF, 0x70}};
-
     IWICImagingFactory* pFactory = nullptr;
-    if (FAILED(pWicFactory(CLSID_WICImagingFactory_L, IID_IWICImagingFactory_L, (void**)&pFactory)) || !pFactory) {
+    if (FAILED(pWicFactory(kCLSID_WICImagingFactory, kIID_IWICImagingFactory, (void**)&pFactory)) || !pFactory) {
         FreeLibrary(hMod);
         return "";
     }
@@ -209,7 +219,7 @@ std::string EncodePixelsToBase64Jpeg(const unsigned char* pixels, int width, int
         // WriteSource の矩形は「ソース(縮小後)の座標系」で指定する
         WICRect rcOut = {0, 0, targetWidth, th};
         if (FAILED(pFactory->CreateBitmapFromMemory(
-                (UINT)width, (UINT)height, GUID_WICPixelFormat32bppBGRA,
+                (UINT)width, (UINT)height, kWICPixelFormat32bppBGRA,
                 (UINT)(width * 4), (UINT)(width * height * 4), (BYTE*)pixels, &pSrcBmp)))
             break;
 
@@ -220,7 +230,7 @@ std::string EncodePixelsToBase64Jpeg(const unsigned char* pixels, int width, int
 
         // JPEG は 24bppBGR でエンコードする
         if (FAILED(pFactory->CreateFormatConverter(&pConv))) break;
-        if (FAILED(pConv->Initialize(pScaler, GUID_WICPixelFormat24bppBGR,
+        if (FAILED(pConv->Initialize(pScaler, kWICPixelFormat24bppBGR,
                                      WICBitmapDitherTypeNone, nullptr, 0.0,
                                      WICBitmapPaletteTypeCustom)))
             break;
@@ -230,7 +240,7 @@ std::string EncodePixelsToBase64Jpeg(const unsigned char* pixels, int width, int
         if (!hGlobal) break;
         if (FAILED(pCreateStream(hGlobal, FALSE, &pStream)) || !pStream) break;
 
-        if (FAILED(pFactory->CreateEncoder(GUID_ContainerFormatJpeg, nullptr, &pEncoder))) break;
+        if (FAILED(pFactory->CreateEncoder(kWICContainerFormatJpeg, nullptr, &pEncoder))) break;
         if (FAILED(pEncoder->Initialize(pStream, WICBitmapEncoderNoCache))) break;
         if (FAILED(pEncoder->CreateNewFrame(&pFrame, &pProps))) break;
 
@@ -250,7 +260,7 @@ std::string EncodePixelsToBase64Jpeg(const unsigned char* pixels, int width, int
         if (FAILED(pFrame->Initialize(pProps))) break;
         if (FAILED(pFrame->SetSize((UINT)targetWidth, (UINT)th))) break;
 
-        WICPixelFormatGUID fmt = GUID_WICPixelFormat24bppBGR;
+        WICPixelFormatGUID fmt = kWICPixelFormat24bppBGR;
         if (FAILED(pFrame->SetPixelFormat(&fmt))) break;
         if (FAILED(pFrame->WriteSource(pConv, &rcOut))) break;
         if (FAILED(pFrame->Commit())) break;
