@@ -1,0 +1,6 @@
+# ビルド成果物のうち配布不要なもの
+dist/*.pdb
+dist/*.lib
+dist/*.exp
+build/
+tools/__pycache__/

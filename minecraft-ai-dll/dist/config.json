@@ -1,0 +1,9 @@
+{
+  "model": "gemma4:e4b",
+  "goal": "木を集めて作業台を作る。障害物があれば回避する。",
+  "ollama_host": "127.0.0.1",
+  "ollama_port": 11434,
+  "interval_ms": 1200,
+  "capture_width": 800,
+  "enabled_by_default": true
+}
